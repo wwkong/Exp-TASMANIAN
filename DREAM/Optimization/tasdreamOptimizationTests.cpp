@@ -37,9 +37,9 @@
 #include "TasmanianOptimization.hpp"
 #include "tasdreamExternalTests.hpp"
 
-namespace TasOptimization {
+namespace TasOPT {
 
-// Unit tests for TasOptimization::ParticleSwarmState.
+// Unit tests for TasOPT::ParticleSwarmState.
 bool testParticleSwarmState(bool verbose) {
     bool pass = true;
 
@@ -64,7 +64,7 @@ bool testParticleSwarmState(bool verbose) {
         pass = pass and (!init_vector[3]);
     }
 
-    // Check TasOptimization::ParticleSwarmState::initializeParticlesInsideBox().
+    // Check TasOPT::ParticleSwarmState::initializeParticlesInsideBox().
     std::vector<double> lower = {-1.0, 1.0};
     std::vector<double> upper = {2.0, 3.0};
     std::minstd_rand park_miller(42);
@@ -96,7 +96,7 @@ bool testParticleSwarmState(bool verbose) {
     init_vector = state.getStateVector();
     pass = pass and init_vector[0] and init_vector[1] and init_vector[2];
 
-    // Check TasOptimization::ParticleSwarmState::clearBestParticles().
+    // Check TasOPT::ParticleSwarmState::clearBestParticles().
     state.clearBestParticles();
     for (auto bp : states[0].getBestParticlePositions()) pass = pass and (bp == 0);
     init_vector = state.getStateVector();
@@ -107,41 +107,39 @@ bool testParticleSwarmState(bool verbose) {
     return pass;
 }
 
-// Unit tests for TasOptimization::ParticleSwarm on a single objective function.
-bool testParticleSwarmSingle(ObjectiveFunction f, ParticleSwarmState state, TasDREAM::DreamDomain inside, int iterations,
-                             double optimal_val) {
+// Unit tests for TasOPT::ParticleSwarm on a single objective function.
+bool testParticleSwarmSingle(ObjectiveFunction f, DomainFunction h, ParticleSwarmState &state, int iterations, double optimal_val) {
     bool pass = true;
 
     // Run the particle swarm algorithm.
     std::minstd_rand park_miller(42);
     std::uniform_real_distribution<double> unif(0.0, 1.0);
     auto get_rand = [&]()->double{ return unif(park_miller); };
-    ParticleSwarm(f, iterations, inside, state, 0.5, 2, 2, get_rand);
+    ParticleSwarm(f, h, iterations, state, 0.5, 2, 2, get_rand);
 
     // Check optimality and state changes of the run.
     std::vector<double> best_swarm_point = state.getBestPosition();
-    std::vector<double> best_swarm_value_vec(1);
-    f(best_swarm_point, best_swarm_value_vec);
+    std::vector<double> best_swarm_value_vec(1), dummy_vec;
+    f(best_swarm_point, best_swarm_value_vec, dummy_vec, nullptr);
     pass = pass and std::fabs(best_swarm_value_vec[0] - optimal_val) <= TasGrid::Maths::num_tol;
     std::vector<bool> init_vector = state.getStateVector();
     pass = pass and init_vector[3];
 
     // Make sure subsequent runs do not make any strange modifications.
-    ParticleSwarm(f, 1, inside, state, 0.5, 2, 2, get_rand);
-    f(best_swarm_point, best_swarm_value_vec);
+    ParticleSwarm(f, h, 1, state, 0.5, 2, 2, get_rand);
+    f(best_swarm_point, best_swarm_value_vec, dummy_vec, nullptr);
     pass = pass and std::fabs(best_swarm_value_vec[0] - optimal_val) <= TasGrid::Maths::num_tol;
     init_vector = state.getStateVector();
     pass = pass and init_vector[3];
 
-    // TasOptimization::ParticleSwarmState::clearCache().
+    // TasOPT::ParticleSwarmState::clearCache().
     state.clearCache();
     init_vector = state.getStateVector();
     pass = pass and init_vector[0] and init_vector[1] and init_vector[2] and !init_vector[3];
-
     return pass;
 }
 
-// Unit tests for TasOptimization::ParticleSwarm on multiple objective functions.
+// Unit tests for TasOPT::ParticleSwarm on multiple objective functions.
 bool testParticleSwarm(bool verbose) {
     bool pass = true;
 
@@ -151,15 +149,26 @@ bool testParticleSwarm(bool verbose) {
     int iterations = 200;
     std::vector<double> lower(num_dimensions, -5.0);
     std::vector<double> upper(num_dimensions, 2.0);
-    TasOptimization::ObjectiveFunctionSingle l1_single =
-            [](const std::vector<double> &x)->double {
-                double sum = 0;
-                for (auto xi : x) sum += std::fabs(xi);
-                return sum;};
-    TasOptimization::ObjectiveFunction l1 = TasOptimization::makeObjectiveFunction(num_dimensions, l1_single);
-    TasOptimization::ParticleSwarmState state(num_dimensions, num_particles);
+    TasOPT::ObjectiveFunction l1_fn =
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double>, const void*)->void {
+                int num_points = x_batch.size() / num_dimensions;
+                std::fill(fval_batch.begin(), fval_batch.end(), 0.0);
+                for (int i=0; i<num_points; i++)
+                    for (int j=0; j<num_dimensions; j++)
+                        fval_batch[i] += std::fabs(x_batch[i * num_dimensions + j]);
+            };
+    TasOPT::DomainFunction l1_box =
+            [=](const std::vector<double> &x_batch, std::vector<bool> &inside_batch, std::vector<double>, const void*)->void {
+               int num_points = x_batch.size() / num_dimensions;
+               std::fill(inside_batch.begin(), inside_batch.end(), true);
+               for (int i=0; i<num_points; i++)
+                   for (int j=0; j<num_dimensions; j++)
+                       inside_batch[i] = inside_batch[i] and (x_batch[i * num_dimensions + j] >= lower[j]) and
+                                         (x_batch[i * num_dimensions + j] <= upper[j]);
+            };
+    TasOPT::ParticleSwarmState state(num_dimensions, num_particles);
     state.initializeParticlesInsideBox(lower, upper);
-    pass = pass and testParticleSwarmSingle(l1, state, TasDREAM::hypercube(lower, upper), iterations, 0);
+    pass = pass and testParticleSwarmSingle(l1_fn, l1_box, state, iterations, 0);
 
     // Six hump-camel function over the domain [-3, 3] x [-2, 2].
     num_dimensions = 2;
@@ -167,15 +176,30 @@ bool testParticleSwarm(bool verbose) {
     iterations = 100;
     lower = {-3.0, -2.0};
     upper = {3.0, 2.0};
-    TasOptimization::ObjectiveFunctionSingle shc_single =
-            [](const std::vector<double> &x)->double {
-                return (4.0 - 2.1 * x[0]*x[0] + x[0]*x[0]*x[0]*x[0] / 3.0) * x[0]*x[0] +
-                        x[0] * x[1] +
-                        (-4.0 + 4.0 * x[1]*x[1]) * x[1]*x[1];};
-    TasOptimization::ObjectiveFunction shc = TasOptimization::makeObjectiveFunction(num_dimensions, shc_single);
+    TasOPT::ObjectiveFunction shc_fn =
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double>, const void*)->void {
+                int num_points = x_batch.size() / num_dimensions;
+                for (int i=0; i<num_points; i++) {
+                    double x0 = x_batch[num_dimensions * i];
+                    double x1 = x_batch[num_dimensions * i + 1];
+                    fval_batch[i] = (4.0 - 2.1 * x0 * x0 + x0 * x0 * x0 * x0 / 3.0) * x0 * x0 +
+                                     x0 * x1 +
+                                     (-4.0 + 4.0 * x1 * x1) * x1 * x1;
+                }
+            };
+    TasOPT::DomainFunction shc_box =
+            [=](const std::vector<double> &x_batch, std::vector<bool> &inside_batch, std::vector<double>, const void*)->void {
+                int num_points = x_batch.size() / num_dimensions;
+                std::fill(inside_batch.begin(), inside_batch.end(), true);
+                for (int i=0; i<num_points; i++)
+                    for (int j=0; j<num_dimensions; j++)
+                        inside_batch[i] = inside_batch[i] and ((x_batch[i * num_dimensions + j] >= lower[j]) and
+                                                               (x_batch[i * num_dimensions + j] <= upper[j]));
+            };
+
     state = ParticleSwarmState(num_dimensions, num_particles);
     state.initializeParticlesInsideBox(lower, upper);
-    pass = pass and testParticleSwarmSingle(shc, state, TasDREAM::hypercube(lower, upper), iterations, -1.031628453489877);
+    pass = pass and testParticleSwarmSingle(shc_fn, shc_box, state, iterations, -1.031628453489877);
 
     // Reporting.
     if (not pass or verbose) reportPassFail(pass, "Particle Swarm", "Algorithm Unit Tests");
@@ -189,8 +213,8 @@ bool DreamExternalTester::testOptimization(){
 
     // Tests various optimization states and algorithms.
     bool pass_particle_swarm = true;
-    pass_particle_swarm = pass_particle_swarm and TasOptimization::testParticleSwarmState(verbose);
-    pass_particle_swarm = pass_particle_swarm and TasOptimization::testParticleSwarm(verbose);
+    pass_particle_swarm = pass_particle_swarm and TasOPT::testParticleSwarmState(verbose);
+    pass_particle_swarm = pass_particle_swarm and TasOPT::testParticleSwarm(verbose);
     reportPassFail(pass_particle_swarm, "Optimization", "Particle Swarm");
     pass = pass and pass_particle_swarm;
 

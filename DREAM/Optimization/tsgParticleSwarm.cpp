@@ -36,7 +36,7 @@
 
 #include "tsgParticleSwarm.hpp"
 
-namespace TasOptimization {
+namespace TasOPT {
 
 
 ParticleSwarmState::ParticleSwarmState(int cnum_dimensions, int cnum_particles):
@@ -62,8 +62,10 @@ ParticleSwarmState::ParticleSwarmState(int cnum_dimensions, std::vector<double> 
         cache_best_particle_inside(std::vector<bool>(num_particles + 1, false)) {};
 
 
-void ParticleSwarmState::initializeParticlesInsideBox(const double box_lower[], const double box_upper[],
+void ParticleSwarmState::initializeParticlesInsideBox(const std::vector<double> &box_lower, const std::vector<double> &box_upper,
                                                       const std::function<double(void)> get_random01) {
+    checkVarSize("ParticleSwarmState::setParticlesInsideBox", "box lower bounds", box_lower.size(), num_dimensions);
+    checkVarSize("ParticleSwarmState::setParticlesInsideBox", "box upper bounds", box_upper.size(), num_dimensions);
     for (int i=0; i<num_particles * num_dimensions; i++) {
         double range = std::fabs(box_upper[i % num_dimensions] - box_lower[i % num_dimensions]);
         particle_positions[i] = range * get_random01() + box_lower[i % num_dimensions];
@@ -73,14 +75,8 @@ void ParticleSwarmState::initializeParticlesInsideBox(const double box_lower[], 
     velocities_initialized = true;
 }
 
-void ParticleSwarmState::initializeParticlesInsideBox(const std::vector<double> &box_lower, const std::vector<double> &box_upper,
-                                                      const std::function<double(void)> get_random01) {
-    checkVarSize("ParticleSwarmState::initializeParticlesInsideBox", "box lower bounds", box_lower.size(), num_dimensions);
-    checkVarSize("ParticleSwarmState::initializeParticlesInsideBox", "box upper bounds", box_upper.size(), num_dimensions);
-    ParticleSwarmState::initializeParticlesInsideBox(box_lower.data(), box_upper.data(), get_random01);
-}
 
-void ParticleSwarm(const ObjectiveFunction f, const int max_iterations, const TasDREAM::DreamDomain inside, ParticleSwarmState &state,
+void ParticleSwarm(const ObjectiveFunction f, const DomainFunction h, const int max_iterations, ParticleSwarmState &state,
                    const double inertia_weight, const double cognitive_coeff, const double social_coeff,
                    const std::function<double(void)> get_random01) {
 
@@ -105,23 +101,21 @@ void ParticleSwarm(const ObjectiveFunction f, const int max_iterations, const Ta
 
     // Create a lambda that converts f to a constrained version that only evaluates points inside the domain. This lambda also
     // writes to a bool vector whose i-th entry is true if particle i is in the domain.
-    auto f_constrained = [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<bool> &inside_batch)->void {
+    auto f_constrained = [&](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<bool> &inside_batch)->void {
         // Collect and apply the domain information given by inside() and x_batch.
         size_t num_batch(fval_batch.size()), num_inside(0);
-        std::vector<double> candidate(num_dimensions), is_inside(num_batch), inside_points;
+        std::vector<double> is_inside(num_batch), inside_points, dummy_vec;
+        h(x_batch, inside_batch, dummy_vec, nullptr);
         for (size_t i=0; i<num_batch; i++) {
             fval_batch[i] = std::numeric_limits<double>::max();
-            std::copy_n(x_batch.begin() + i * num_dimensions, num_dimensions, candidate.begin());
-            inside_batch[i] = inside(candidate);
             if (inside_batch[i]) {
-                std::copy_n(candidate.begin(), num_dimensions, std::back_inserter(inside_points));
+                std::copy_n(&(x_batch[i * num_dimensions]), num_dimensions, std::back_inserter(inside_points));
                 num_inside++;
             }
         }
         // Evaluate f on the inside points and copy the resulting values to fval_batch.
         std::vector<double> inside_vals(num_inside);
-        if (num_inside > 0)
-            f(inside_points, inside_vals);
+        f(inside_points, inside_vals, dummy_vec, nullptr);
         int j = 0;
         for (size_t i=0; i<num_batch; i++) {
             if (inside_batch[i])
@@ -134,11 +128,10 @@ void ParticleSwarm(const ObjectiveFunction f, const int max_iterations, const Ta
         for (size_t i=0; i<num_particles; i++) {
             bool is_smaller = (cache_particle_fvals[i] < cache_best_particle_fvals[i]) or !cache_best_particle_inside[i];
             if (cache_particle_fvals[i] and is_smaller) {
-                std::copy_n(particle_positions.begin() + i * num_dimensions, num_dimensions, best_particle_positions.begin() + i * num_dimensions);
+                std::copy_n(&(particle_positions[i * num_dimensions]), num_dimensions, &(best_particle_positions[i * num_dimensions]));
                 cache_best_particle_fvals[i] = cache_particle_fvals[i];
                 if (cache_best_particle_fvals[i] < cache_best_particle_fvals[num_particles]) {
-                    std::copy_n(particle_positions.begin() + i * num_dimensions, num_dimensions,
-                                best_particle_positions.begin() + num_particles * num_dimensions);
+                    std::copy_n(&(particle_positions[i * num_dimensions]), num_dimensions, &(best_particle_positions[num_particles * num_dimensions]));
                     cache_best_particle_fvals[num_particles] = cache_best_particle_fvals[i];
                     cache_best_particle_inside[num_particles] = true;
                 }

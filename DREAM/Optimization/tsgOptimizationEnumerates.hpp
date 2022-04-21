@@ -31,54 +31,57 @@
  * FROM OR ARISING OUT OF, IN WHOLE OR IN PART THE USE, STORAGE OR DISPOSAL OF THE SOFTWARE.
  */
 
-#ifndef __TASMANIAN_OPTIMIZATION_HPP
-#define __TASMANIAN_OPTIMIZATION_HPP
+#ifndef __TASMANIAN_OPTIMIZATION_ENUMERATES_HPP
+#define __TASMANIAN_OPTIMIZATION_ENUMERATES_HPP
 
-#include "tsgOptimizationModel.hpp"
-#include "tsgParticleSwarm.hpp"
-#include "tsgGradientDescent.hpp"
-#include "tsgAccelProxDescent.hpp"
+#include "TasmanianDREAM.hpp"
+#include <chrono>
+#include <set>
 
 /*!
  * \internal
- * \file TasmanianOptimization.hpp
- * \brief Optimization states and methods.
+ * \file tsgOptimizationEnumerates.hpp
+ * \brief The enumerated types used in the Optimization module.
  * \author Weiwei Kong & Miroslav Stoyanov
  * \ingroup TasmanianOPT
  *
- * The main header required to gain access to the optimization capabilities of Tasmanian.
- * The header will include all files needed by the optimization module including the TasmanianSparseGrid.hpp and
- * TasmanianDREAM headers.
+ * Defines the enumerated types used throughout the Optimization module.
+ * The file is included in every other Optimization header.
  * \endinternal
  */
 
 /*!
- * \defgroup TasmanianOPT Function Optimization
+ * \ingroup TasmanianOPT
+ * \addtogroup OptimizationEnumerates Enumerated types
  *
- * \par Function Optimization
- * A collection of optimization algorithms and classes for minimizing extended real-valued functions.
+ * The Enumerate types used in the external and internal API of the Optimization module.
  */
 
-/*!
- * \ingroup TasmanianOPT
- * \addtogroup OptimizationState Optimization States
- *
- * States that are updated during the execution of an optimization algorithm.
- */
+namespace TasOPT {
 
-/*!
- * \ingroup TasmanianOPT
- * \addtogroup OptimizationAlgorithm Optimization Algorithms
- *
- * Algorithms that are used to minimize an extended real-valued function over a given domain.
- */
+//! \brief Optimization Model Senses.
+//! \ingroup OptimizationEnumerates
+enum ModelSense {
+    MINIMIZE, // (default).
+    MAXIMIZE,
+};
 
-/*!
- * \ingroup TasmanianOPT
- * \brief Encapsulates the Tasmanian Optimization module.
- *
- * Optimization related classes and methods that sit under the TasOptimization namespace.
- */
-namespace TasOPT {}
+//! \brief Available Optimization Algorithms.
+//! \ingroup OptimizationEnumerates
+enum OptimizationAlgorithm {
+    NO_ALGORITHM, // (default)
+    PARTICLE_SWARM,
+};
+
+//! \brief Optimization Model Termination Statuses
+//! \ingroup OptimizationEnumerates
+enum ModelStatus {
+    OPTIMIZE_NOT_CALLED, // (default)
+    ITERATION_LIMIT,
+    RUNTIME_LIMIT,
+    STATIONARITY_LIMIT,
+};
+
+}
 
 #endif

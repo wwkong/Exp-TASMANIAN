@@ -567,61 +567,69 @@ void testDebug(){
     cout << "Debug Test" << endl;
     cout << "Put here testing code and call this with ./dreamtest debug" << endl;
 
-    TasOptimization::ObjectiveFunction f = [](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
-        double sqr_norm = x_batch[0] * x_batch[0] + x_batch[1] * x_batch[1];
-        for (size_t i=0; i<fval_batch.size(); i++)
-            fval_batch[i] = 0.01 * exp(sqr_norm);
-            // fval_batch[i] = 100.0 * (x_batch[2*i] * x_batch[2*i] + x_batch[2*i+1] * x_batch[2*i+1]);
-    };
-    TasOptimization::GradientFunction g = [](const std::vector<double> &x_batch, std::vector<double> &grad_batch)->void {
-        double sqr_norm = x_batch[0] * x_batch[0] + x_batch[1] * x_batch[1];
-        for (size_t i=0; i<grad_batch.size(); i++)
-            grad_batch[i] = 0.01 * 2 * x_batch[i] * exp(sqr_norm);
-        // for (size_t i=0; i<grad_batch.size(); i++)
-        //     grad_batch[i] = 200.0 * x_batch[i];
-    };
-    TasOptimization::ProjectionFunction proj =  [](const std::vector<double> &x_batch, std::vector<double> &proj_batch)->void {
-        for (size_t i=0; i<proj_batch.size(); i++) proj_batch[i] = std::max(-3.0, std::min(3.0, x_batch[i]));
-    };
+    // Basic test.
+    int num_dimensions = 2;
+    std::vector<double> lower = {-3.0, -2.0};
+     std::vector<double> upper = {3.0, 2.0};
 
-    int num_iters = 50;
-    std::vector<double> fval(1);
-    std::vector<double> x0 = {1.0, 3.0};
-    std::vector<double> x(2);
+    TasOPT::ObjectiveFunction obj_fn =
+            // Six-hump camel function.
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double> &grad_batch, const void*)->void {
+                for (size_t i=0; i<fval_batch.size(); i++) {
+                    double x0 = x_batch[num_dimensions * i];
+                    double x1 = x_batch[num_dimensions * i + 1];
+                    fval_batch[i] = (4.0 - 2.1 * x0 * x0 + x0 * x0 * x0 * x0 / 3.0) * x0 * x0 +
+                                     x0 * x1 +
+                                     (-4.0 + 4.0 * x1 * x1) * x1 * x1;
+                }
+                if (grad_batch.size() > 0) {
+                    for (size_t i=0; i<fval_batch.size(); i++) {
+                        double x0 = x_batch[num_dimensions * i];
+                        double x1 = x_batch[num_dimensions * i + 1];
+                        grad_batch[2*i] = 8.0 * x0 - 2.1 * 4.0 * x0 * x0 * x0 + 2.0 * x0 * x0 * x0 * x0 * x0 + x1;
+                        grad_batch[2*i + 1] = x0 - 8.0 * x1 + 16.0 * x1 * x1 * x1;
+                    }
+                }
+            };
 
-    // PGD
-    std::cout << "GRADIENT DESCENT" << "\n";
-    x = x0;
-    auto pgd_state = TasOptimization::GradientDescentState(x, 1 / 1000.0);
-    for (int k=1; k<=num_iters; k++) {
-        TasOptimization::GradientDescent(f, g, proj, 1, pgd_state, {1.25, 1.25});
-        x = pgd_state.getCandidate();
-        f(x, fval);
-        std::cout << "k = " << k << std::scientific << std::setprecision(3)
-                  << ",\t\tL = " << 1.0 / pgd_state.getStepsize()
-                  << ",\t\tx =";
-        for (int i=0; i<2; i++) std::cout << " " << x[i];
-        std::cout << ",\tf(x) = " << fval[0] << "\n";
-    }
-    std::cout << std::endl;
+     // TasOPT::ObjectiveFunction obj_fn =
+     //        // Negative l2-norm squared.
+     //        [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double> &grad_batch, const void*)->void {
+     //            for (size_t i=0; i<fval_batch.size(); i++) {
+     //                double x0 = x_batch[num_dimensions * i];
+     //                double x1 = x_batch[num_dimensions * i + 1];
+     //                fval_batch[i] = -x0 * x0 - x1 * x1;
+     //            }
+     //            if (grad_batch.size() > 0) {
+     //                for (size_t i=0; i<fval_batch.size(); i++) {
+     //                    double x0 = x_batch[num_dimensions * i];
+     //                    double x1 = x_batch[num_dimensions * i + 1];
+     //                    grad_batch[2*i] = -2.0 * x0;
+     //                    grad_batch[2*i + 1] = -2.0 * x1;
+     //                }
+     //            }
+     //        };
 
-    // APD
-    std::cout << "ACCELERATED PROXIMAL DESCENT" << "\n";
-    x = x0;
-    auto apd_state = TasOptimization::AccelProxDescentState(x, 1.0, 1000.0);
-    for (int k=1; k<=num_iters; k++) {
-        TasOptimization::AccelProxDescent(f, g, proj, 1, apd_state, 4.0, {1.25, 1.25}, {1.25, 1.25});
-        x = apd_state.getCandidate();
-        f(x, fval);
-        std::cout << "k = " << k << std::scientific << std::setprecision(3)
-                  << ",\t\tm = " << apd_state.getLowerCurvature()
-                  << ",\t\tM = " << apd_state.getUpperCurvature()
-                  << ",\t\tx =";
-        for (int i=0; i<2; i++) std::cout << " " << x[i];
-        std::cout << ",\tf(x) = " << fval[0] << "\n";
-    }
-    std::cout << std::endl;
+    auto model = TasOPT::OptimizationModel(num_dimensions);
+    model.setAlgorithm(TasOPT::PARTICLE_SWARM);
+    model.setObjective(TasOPT::MINIMIZE, obj_fn, true);
+    model.setVarLowerBounds(lower);
+    model.setVarUpperBounds(upper);
+    model.setIterationLimit(1000);
+    model.setStationarityLimit(1E-10);
 
+    std::cout << "\n============================================================================================= \n\n";
+    model.printSummary();
+    std::cout << "\n============================================================================================= \n\n";
+    model.printAlgorithmParameters();
+    std::cout << "\n============================================================================================= \n\n";
+    model.optimize();
+    model.printSummary();
+    std::vector<double> xBar = model.getCandidateSolution();
+    std::cout << "\n xBar = ";
+    for (auto x : xBar) std::cout << x << " ";
+    std::cout << "\n\n";
+    std::cout << "============================================================================================= \n\n";
 }
 
 #endif
