@@ -41,7 +41,7 @@ namespace TasOptimization {
 class AccelProxDescentState {
   public:
     AccelProxDescentState() = delete;
-    AccelProxDescentState(const std::vector<double> x, const double lower, const double upper);
+    AccelProxDescentState(const std::vector<double> candidate, const double lower, const double upper);
     AccelProxDescentState(const AccelProxDescentState &source) = default;
     AccelProxDescentState(AccelProxDescentState &&source) = default;
     AccelProxDescentState& operator=(AccelProxDescentState &&source) = default;
@@ -49,41 +49,45 @@ class AccelProxDescentState {
     inline int getNumDimensions() const {return num_dimensions;}
     inline double getLowerCurvature() const {return lower_curvature;}
     inline double getUpperCurvature() const {return upper_curvature;}
-    inline void getCandidate(double x[]) const {std::copy_n(candidate.begin(), num_dimensions, x);}
+    inline void getCandidate(double zBar[]) const {std::copy_n(candidate.begin(), num_dimensions, zBar);}
     inline std::vector<double> getCandidate() const {return candidate;}
 
     inline void setLowerCurvature(const double m0) {lower_curvature = m0;}
     inline void setUpperCurvature(const double M0) {upper_curvature = M0;}
-    inline void setCandidate(const double x[]) {std::copy_n(x, num_dimensions, candidate.begin());}
-    inline void setCandidate(const std::vector<double> &x) {
-        checkVarSize("AccelProxDescentState::setCandidate", "candidate point", x.size(), num_dimensions);
-        candidate = x;
+    inline void setCandidate(const double zBar[]) {std::copy_n(zBar, num_dimensions, candidate.begin());}
+    inline void setCandidate(const std::vector<double> &zBar) {
+        checkVarSize("AccelProxDescentState::setCandidate", "candidate point", zBar.size(), num_dimensions);
+        candidate = zBar;
     }
 
-    friend void AccelProxDescent(const ObjectiveFunction f, const GradientFunction grad, const ProjectionFunction proj,
+    friend void updateQCoeffs(double &Q_const, std::vector<double> &Q_linear, AccelProxDescentState &state);
+    friend bool goodUpperCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
+    friend bool goodLowerCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
+    friend void accelStep(const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state);
+    friend void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
                                  const int num_iterations, AccelProxDescentState &state, const std::vector<double> &line_search_coeffs);
 
   protected:
-    inline void resetInnerState(bool failure);
-    inline void accelStep();
-    inline bool goodUpperCurvature();
-    inline bool goodLowerCurvature();
+    template<bool failure> void resetInnerState();
     inline std::vector<double> &getCandidateRef() {return candidate;}
+    inline std::vector<double> &getUTildeRef() {return u_tilde;}
     inline std::vector<double> &getXPrevRef() {return x_prev;}
+    inline std::vector<double> &getXRef() {return x;}
     inline std::vector<double> &getXTildePrevRef() {return x_tilde_prev;}
     inline std::vector<double> &getYPrevRef() {return y_prev;}
     inline std::vector<double> &getZPrevRef() {return z_prev;}
+    inline std::vector<double> &getQLinearPrevRef() {return Q_linear_prev;}
     inline std::vector<double> &getQLinearRef() {return Q_linear;}
 
   private:
-    int num_dimensions, num_inner_iterations;
-    double lower_curvature, upper_curvature, A_prev, Q_const;
-    std::vector<double> candidate, x_prev, x_tilde_prev, y_prev, z_prev, Q_linear;
+    int num_dimensions;
+    double lower_curvature, upper_curvature, A_prev, A, sum_of_A, Q_const_prev, Q_const;
+    std::vector<double> candidate, u_tilde, x_prev, x, x_tilde_prev, y_prev, z_prev, Q_linear_prev, Q_linear;
 };
 
 // Forward declarations.
-void GradientDescent(const ObjectiveFunction f, const GradientFunction grad, const ProjectionFunction proj,
-                     const int num_iterations, AccelProxDescentState &state, const std::vector<double> line_search_coeffs = {});
+void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
+                      const int num_iterations, AccelProxDescentState &state, const std::vector<double> &line_search_coeffs = {});
 
 }
 
