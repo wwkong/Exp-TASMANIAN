@@ -63,7 +63,7 @@ class AccelProxDescentState {
     friend void updateQCoeffs(double &Q_const, std::vector<double> &Q_linear, AccelProxDescentState &state);
     friend bool goodUpperCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
     friend bool goodLowerCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
-    friend void accelStep(const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state);
+    friend void accelStep(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state);
     friend void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
                                  const int num_iterations, AccelProxDescentState &state, const std::vector<double> &line_search_coeffs);
 
@@ -81,7 +81,7 @@ class AccelProxDescentState {
 
   private:
     int num_dimensions;
-    double lower_curvature, upper_curvature, A_prev, A, sum_of_A, Q_const_prev, Q_const;
+    double lower_curvature, upper_curvature, A_prev, A, Q_const_prev, Q_const;
     std::vector<double> candidate, u_tilde, x_prev, x, x_tilde_prev, y_prev, z_prev, Q_linear_prev, Q_linear;
 };
 

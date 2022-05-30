@@ -40,16 +40,17 @@ namespace TasOptimization {
 
 AccelProxDescentState::AccelProxDescentState(const std::vector<double> candidate, const double lower, const double upper) :
         num_dimensions((int) candidate.size()), lower_curvature(lower), upper_curvature(upper), A_prev(0.0), A(0.0),
-        sum_of_A(0.0), Q_const_prev(0.0), Q_const(0.0), candidate(candidate), u_tilde(std::vector<double>(num_dimensions, 0.0)),
+        Q_const_prev(0.0), Q_const(0.0), candidate(candidate), u_tilde(std::vector<double>(num_dimensions, 0.0)),
         x_prev(candidate), x(candidate), x_tilde_prev(candidate), y_prev(candidate), z_prev(candidate),
         Q_linear_prev(std::vector<double>(num_dimensions, 0.0)), Q_linear(Q_linear_prev) {};
 
 template<bool failure>
 void AccelProxDescentState::resetInnerState() {
-    sum_of_A = 0.0;
     A_prev = 0.0;
     Q_const_prev = 0.0;
+    Q_const = 0.0;
     Q_linear_prev = std::vector<double>(num_dimensions, 0.0);
+    Q_linear = std::vector<double>(num_dimensions, 0.0);
     if (failure) {
         x_prev = z_prev;
         x_tilde_prev = z_prev;
@@ -159,7 +160,7 @@ bool goodLowerCurvature(const ObjectiveFunction &f, const GradientFunction &g, A
     return true;
 }
 
-void accelStep(const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state) {
+void accelStep(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state) {
     const std::vector<double> x_prev = state.getXPrevRef();
     const std::vector<double> y_prev = state.getYPrevRef();
     std::vector<double> x_tilde_prev = state.getXTildePrevRef();
@@ -187,8 +188,17 @@ void accelStep(const GradientFunction &g, const ProjectionFunction &proj, AccelP
     std::vector<double> Q_linear_prev = state.getQLinearPrevRef();
     std::vector<double> Q_linear = state.getQLinearRef();
     g(y, grad_psi_y);
-    for (int i=0; i<state.num_dimensions; i++)
-        u_tilde[i] = grad_psi_y[i] - grad_psi_x_tilde_prev[i] + (L + mu) * (x_tilde_prev[i] - y[i]);
+    double psi_x_tilde_prev = work[0];
+    f(x_tilde_prev, work);
+    state.Q_const = (state.A_prev * state.Q_const_prev + a_prev * psi_x_tilde_prev) / state.A;
+    for (int i=0; i<state.num_dimensions; i++) {
+        double delta1 = x_tilde_prev[i] - y[i];
+        u_tilde[i] = grad_psi_y[i] - grad_psi_x_tilde_prev[i] + (L + mu) * delta1;
+        Q_linear[i] += (Q_linear_prev[i] * state.A_prev - a_prev * (mu * y[i] + L * delta1)) / state.A;
+        state.Q_const += a_prev / state.A * (grad_psi_x_tilde_prev[i] * delta1 +
+                                             mu / 2 * (delta1 * delta1 + y[i] * y[i]) +
+                                             L * y[i] * delta1);
+    }
 }
 
 void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj, const int num_iterations,
@@ -196,9 +206,6 @@ void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, con
 
     if (line_search_coeffs.size() != 0 and line_search_coeffs.size() != 2)
         throw std::runtime_error("ERROR: in AccelProxDescent(), expects line_search_coeffs.size() == 2 if non-empty");
-
-    int num_dimensions = state.num_dimensions;
-    std::vector<double> candidate = state.getCandidateRef();
 
     // Based on the paper: ???
 }
