@@ -19,6 +19,8 @@ add_library(Tasmanian_libdream  TasmanianDREAM.hpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgParticleSwarm.cpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgGradientDescent.hpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgGradientDescent.cpp
+                                ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgAccelProxDescent.hpp
+                                ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgAccelProxDescent.cpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/Optimization/tsgOptimizationUtils.hpp)
 
 target_include_directories(Tasmanian_libdream PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/>)

@@ -580,21 +580,19 @@ void testDebug(){
 
     std::vector<double> fval(1);
     std::vector<double> x = {1.0, 3.0};
-    auto gds = TasOptimization::GradientDescentState(x, 0.01);
+    auto state = TasOptimization::AccelProxDescentState(x, 1.0, 8.0);
 
-    x = gds.getCandidate();
-    f(x, fval);
-    std::cout << "k = 0, x = ";
-    for (int i=0; i<2; i++) std::cout << x[i] << " ";
-    std::cout << ", f(x) = " << fval[0] << std::endl;
-
-    for (int k=1; k<=20; k++) {
-        TasOptimization::GradientDescent(f, g, proj, 1, gds, {1.25, 1.25});
-        x = gds.getCandidate();
+    for (int k=1; k<=10; k++) {
+        TasOptimization::AccelProxDescent(f, g, proj, 1, state, 4.0, {1.25, 1.25}, {1.25, 1.25});
+        x = state.getCandidate();
         f(x, fval);
-        std::cout << "k = " << k << std::scientific << std::setprecision(3) << ",\tstepsize = " << gds.getStepsize() << ",\tx =";
+        std::cout << "k = " << k << std::scientific << std::setprecision(3)
+                  // << ",\tstepsize = " << state.getStepsize()
+                  << ",\t\tm = " << state.getLowerCurvature()
+                  << ",\t\tM = " << state.getUpperCurvature()
+                  << ",\t\tx =";
         for (int i=0; i<2; i++) std::cout << " " << x[i];
-        std::cout << ",\tf(x) = " << fval[0] << std::endl;
+        std::cout << ",\tf(x) = " << fval[0] << "\n" << std::endl;
     }
 
 }

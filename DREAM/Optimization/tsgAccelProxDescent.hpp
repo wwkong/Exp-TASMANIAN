@@ -81,15 +81,17 @@ class AccelProxDescentState {
     inline std::vector<double> &getQLinearRef() {return Q_linear;}
 
   private:
-    int num_dimensions;
-    double lower_curvature, upper_curvature, A_prev, A, Q_const_prev, Q_const;
+    int num_dimensions, num_inner_iterations;
+    double lower_curvature, upper_curvature, A_prev, A, Q_const_prev, Q_const, inner_prox_stepsize;
     std::vector<double> candidate, u_tilde, x_prev, x, x_tilde_prev, y_prev, z_prev, Q_linear_prev, Q_linear;
+    ObjectiveFunction psi;
+    GradientFunction grad_psi;
 };
 
 // Forward declarations.
 void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
-                      const int num_iterations, AccelProxDescentState &state, const std::vector<double> &lower_line_search_coeffs,
-                      const std::vector<double> &upper_line_search_coeffs);
+                      const int num_iterations, AccelProxDescentState &state, double theta,
+                      const std::vector<double> &lower_line_search_coeffs, const std::vector<double> &upper_line_search_coeffs);
 
 }
 
