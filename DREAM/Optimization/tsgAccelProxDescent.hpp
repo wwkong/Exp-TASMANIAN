@@ -60,12 +60,13 @@ class AccelProxDescentState {
         candidate = zBar;
     }
 
-    friend void updateQCoeffs(double &Q_const, std::vector<double> &Q_linear, AccelProxDescentState &state);
-    friend bool goodUpperCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
-    friend bool goodLowerCurvature(const ObjectiveFunction &f, const GradientFunction &g, AccelProxDescentState &state);
-    friend void accelStep(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj, AccelProxDescentState &state);
+    friend bool goodUpperCurvature(const ObjectiveFunction &psi, const GradientFunction &grad_psi, AccelProxDescentState &state);
+    friend bool goodLowerCurvature(const ObjectiveFunction &psi, const GradientFunction &grad_psi, AccelProxDescentState &state);
+    friend void accelStep(const ObjectiveFunction &psi, const GradientFunction &grad_psi, const ProjectionFunction &proj, AccelProxDescentState &state);
+    friend bool terminateInner(const ObjectiveFunction &psi, AccelProxDescentState &state, double theta);
     friend void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
-                                 const int num_iterations, AccelProxDescentState &state, const std::vector<double> &line_search_coeffs);
+                                 const int num_iterations, AccelProxDescentState &state, double theta,
+                                 const std::vector<double> &lower_line_search_coeffs, const std::vector<double> &upper_line_search_coeffs);
 
   protected:
     template<bool failure> void resetInnerState();
@@ -87,7 +88,8 @@ class AccelProxDescentState {
 
 // Forward declarations.
 void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, const ProjectionFunction &proj,
-                      const int num_iterations, AccelProxDescentState &state, const std::vector<double> &line_search_coeffs = {});
+                      const int num_iterations, AccelProxDescentState &state, const std::vector<double> &lower_line_search_coeffs,
+                      const std::vector<double> &upper_line_search_coeffs);
 
 }
 
