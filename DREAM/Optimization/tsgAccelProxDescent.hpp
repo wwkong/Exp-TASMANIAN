@@ -81,7 +81,7 @@ class AccelProxDescentState {
     inline std::vector<double> &getQLinearRef() {return Q_linear;}
 
   private:
-    int num_dimensions, num_inner_iterations;
+    int num_dimensions;
     double lower_curvature, upper_curvature, A_prev, A, Q_const_prev, Q_const, inner_prox_stepsize;
     std::vector<double> candidate, u_tilde, x_prev, x, x_tilde_prev, y_prev, z_prev, Q_linear_prev, Q_linear;
     ObjectiveFunction psi;

@@ -569,10 +569,10 @@ void testDebug(){
 
     TasOptimization::ObjectiveFunction f = [](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
         for (size_t i=0; i<fval_batch.size(); i++)
-            fval_batch[i] = 5.0 * (x_batch[2*i] * x_batch[2*i] + x_batch[2*i+1] * x_batch[2*i+1]);
+            fval_batch[i] = 100.0 * (x_batch[2*i] * x_batch[2*i] + x_batch[2*i+1] * x_batch[2*i+1]);
     };
     TasOptimization::GradientFunction g = [](const std::vector<double> &x_batch, std::vector<double> &grad_batch)->void {
-        for (size_t i=0; i<grad_batch.size(); i++) grad_batch[i] = 10.0 * x_batch[i];
+        for (size_t i=0; i<grad_batch.size(); i++) grad_batch[i] = 200.0 * x_batch[i];
     };
     TasOptimization::ProjectionFunction proj =  [](const std::vector<double> &x_batch, std::vector<double> &proj_batch)->void {
         for (size_t i=0; i<proj_batch.size(); i++) proj_batch[i] = std::max(-3.0, std::min(3.0, x_batch[i]));
@@ -580,7 +580,7 @@ void testDebug(){
 
     std::vector<double> fval(1);
     std::vector<double> x = {1.0, 3.0};
-    auto state = TasOptimization::AccelProxDescentState(x, 1.0, 8.0);
+    auto state = TasOptimization::AccelProxDescentState(x, 1.0, 150.0);
 
     for (int k=1; k<=10; k++) {
         TasOptimization::AccelProxDescent(f, g, proj, 1, state, 4.0, {1.25, 1.25}, {1.25, 1.25});
