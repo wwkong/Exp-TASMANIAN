@@ -46,10 +46,11 @@ AccelProxDescentState::AccelProxDescentState(const std::vector<double> candidate
         Q_linear(Q_linear_prev) {};
 
 template<bool failure>
-void AccelProxDescentState::resetInnerState() {
+void AccelProxDescentState::resetInnerState(double lower_adjustment) {
     A_prev = 0.0;
     Q_const_prev = 0.0;
     Q_linear_prev = std::vector<double>(num_dimensions, 0.0);
+    lower_curvature *= lower_adjustment;
     inner_prox_stepsize = 0.5 / lower_curvature;
     if (!failure) {
         x_prev = candidate;
@@ -58,7 +59,7 @@ void AccelProxDescentState::resetInnerState() {
     }
 }
 
-// Relative version of >.
+// Relative version of `a > b`.
 bool rel_gt(double a, double b) {
     double base = std::max(1.0, std::min(a, b));
     return (a / base) > (b / base) + TasGrid::Maths::num_tol;
@@ -76,7 +77,7 @@ bool goodUpperCurvature(const ObjectiveFunction &psi, const GradientFunction &gr
     double psi_y = work[0];
     grad_psi(x_tilde_prev, grad_psi_x_tilde_prev);
 
-    // Check condition 1 (classic descent inequality).
+    // Condition 1 (classic descent inequality).
     lhs += psi_y - psi_x_tilde_prev;
     for (int i=0; i<state.num_dimensions; i++) {
         double delta = y[i] - x_tilde_prev[i];
@@ -85,7 +86,7 @@ bool goodUpperCurvature(const ObjectiveFunction &psi, const GradientFunction &gr
     }
     if (rel_gt(lhs, rhs)) return false;
 
-    // Check condition 2 (technical descent inequality).
+    // Condition 2 (technical descent inequality).
     const std::vector<double> &x = state.getXRef();
     const std::vector<double> &x_prev = state.getXPrevRef();
     double xi = 1.0 + mu * state.A;
@@ -146,10 +147,6 @@ bool goodLowerCurvature(const ObjectiveFunction &psi, const GradientFunction &gr
     rhs = psi_y;
     for (int i=0; i<state.num_dimensions; i++)
         lhs += 0.5 * mu * y[i] * y[i] + Q_linear[i] * y[i];
-
-    // if (rel_ge(lhs, rhs))
-    std::cout << "Lower2b: lhs = " << lhs << ", rhs = " << rhs << std::endl;
-
     if (rel_gt(lhs, rhs)) return false;
 
     // Condition 3 (variational minorization)
@@ -161,10 +158,6 @@ bool goodLowerCurvature(const ObjectiveFunction &psi, const GradientFunction &gr
     rhs = psi_y0;
     for (int i=0; i<state.num_dimensions; i++)
         lhs += u_tilde[i] * (y0[i] - y[i]);
-
-    if (rel_gt(lhs, rhs))
-        std::cout << "Lower3: lhs = " << lhs << ", rhs = " << rhs << std::endl;
-
     if (rel_gt(lhs, rhs)) return false;
 
     // All conditions pass here.
@@ -215,24 +208,12 @@ void accelStep(const ObjectiveFunction &psi, const GradientFunction &grad_psi, c
         // overwrite
         Q_linear[i] = (Q_linear_prev[i] * state.A_prev - a_prev * (mu * y[i] + L * delta)) / state.A;
     }
-
-    // double Q_at_y_prev = state.Q_const;
-    // for (int i=0; i<state.num_dimensions; i++)
-    //     Q_at_y_prev += Q_linear[i] * y_prev[i] + 0.5 * mu * y_prev[i] * y_prev[i];
-
-    // std::cout << "Q_at_y_prev (accel) = " << Q_at_y_prev << std::endl;
-
-    // std::cout << "Q_linear (accel) =";
-    // for (auto e : Q_linear) std::cout << " " << e;
-    // std::cout << std::endl;
-
-    // std::cout << "Q_const (accel) = " << state.Q_const << std::endl;
 }
 
 bool terminateInner(const ObjectiveFunction &psi, AccelProxDescentState &state, double theta) {
     std::vector<double> work(1);
     double lhs(0.0), rhs(0.0), sqr_prox_dist(0.0);
-    // Condition 1.
+    // Condition 1 (variational bound).
     psi(state.z_prev, work);
     double psi_y0 = work[0];
     psi(state.candidate, work);
@@ -247,7 +228,7 @@ bool terminateInner(const ObjectiveFunction &psi, AccelProxDescentState &state, 
     rhs += 0.5 * theta * sqr_prox_dist;
     if (rel_gt(lhs, rhs)) return false;
 
-    // Condition 2.
+    // Condition 2 (sufficient descent).
     lhs = 0.0;
     rhs = 0.25 * sqr_prox_dist;
     for (int i=0; i<state.num_dimensions; i++)
@@ -286,94 +267,49 @@ void AccelProxDescent(const ObjectiveFunction &f, const GradientFunction &g, con
     if (upper_line_search_coeffs.size() != 0 and upper_line_search_coeffs.size() != 2)
         throw std::runtime_error("ERROR: in AccelProxDescent(), expects upper_line_search_coeffs.size() == 2 if non-empty");
 
+    // Initialize for readability.
     int num_dimensions = state.num_dimensions;
     int current_iteration = 0;
     double l0 = lower_line_search_coeffs[0];
     double l1 = lower_line_search_coeffs[1];
     double u0 = upper_line_search_coeffs[0];
     double u1 = upper_line_search_coeffs[1];
-
     std::vector<double> &candidate = state.getCandidateRef();
     std::vector<double> &z_prev = state.getZPrevRef();
-
     ObjectiveFunction psi = create_psi(f, z_prev, state.inner_prox_stepsize);
     GradientFunction grad_psi = create_grad_psi(g, z_prev, state.inner_prox_stepsize);
 
     // Main algorithm.
     while (current_iteration < num_iterations) {
-
-        // Attack the inner prox-subproblem and check upper curvature approximation.
         do {
+            // STEP: Apply a single accelerated step.
             if (current_iteration >= num_iterations) return;
             accelStep(psi, grad_psi, proj, state);
             state.upper_curvature *= u0;
             current_iteration++;
         } while(!goodUpperCurvature(psi, grad_psi, state));
-        state.upper_curvature /= u0;
-
-        // std::cout << "m0 = " << state.lower_curvature << ", M0 = " << state.upper_curvature
-        //           << ", L0 = " << 0.5 * state.upper_curvature / state.lower_curvature + 1.0 << std::endl;
-
-        // std::cout << "A_prev = " << state.A_prev << std::endl;
-
-        // std::cout << "state.inner_prox_stepsize = " << state.inner_prox_stepsize << std::endl;
-
-        // std::cout << "x_prev (pre) =";
-        // for (auto e : state.x_prev) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::cout << "x_tilde_prev (pre) =";
-        // for (auto e : state.x_tilde_prev) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::vector<double> grad_work(state.num_dimensions);
-        // grad_psi(state.x_tilde_prev, grad_work);
-        // std::cout << "grad_psi_x_tilde_prev (pre) =";
-        // for (auto e : grad_work) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::cout << "x (pre) =";
-        // for (auto e : state.x) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::cout << "y_prev (pre) =";
-        // for (auto e : state.y_prev) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::cout << "y (pre) =";
-        // for (auto e : state.candidate) std::cout << " " << e;
-        // std::cout << std::endl;
-
-        // std::cout << "z_prev (pre) =";
-        // for (auto e : state.z_prev) std::cout << " " << e;
-        // std::cout << std::endl;
+        state.upper_curvature /= u0; // Offset to make sure we use the right upper_curvature.
 
         if (!goodLowerCurvature(psi, grad_psi, state)) {
-            // Check lower curvature approximation.
-            std::cout << "STATUS: BAD LOWER" << std::endl;
-            state.upper_curvature /= u1;
-            state.lower_curvature *= l0;
-            state.inner_prox_stepsize = 0.5 * state.lower_curvature;
-            state.resetInnerState<true>();
+            // FAILURE: Reset the outer loop with a larger lower curvature.
+            state.resetInnerState<true>(l0);
             psi = create_psi(f, z_prev, state.inner_prox_stepsize);
             grad_psi = create_grad_psi(g, z_prev, state.inner_prox_stepsize);
         } else if (terminateInner(psi, state, theta)) {
-            // Check inner termination for advancing the outer loop + optimistic curvature adjustment.
-            std::cout << "STATUS: CONTINUE OUTER" << std::endl;
-            state.lower_curvature /= l1;
-            state.inner_prox_stepsize = 0.5 * state.lower_curvature;
-            state.resetInnerState<false>();
+            // SUCCESS: Advance the outer loop.
+            // Also optimistically decreases the lower curvature.
+            state.resetInnerState<false>(1.0 / l1);
             psi = create_psi(f, z_prev, state.inner_prox_stepsize);
             grad_psi = create_grad_psi(g, z_prev, state.inner_prox_stepsize);
         } else {
-            // Manually update the state for the next inner iteration.
-            std::cout << "STATUS: CONTINUE INNER" << std::endl;
+            // CONTINUE: Advance the inner loop.
+            // Also optimistically decreases the upper curvature.
             state.upper_curvature /= u1;
             state.A = state.A_prev;
             state.Q_const_prev = state.Q_const;
             std::swap(state.Q_linear_prev, state.Q_linear);
-            std::copy_n(candidate.begin(), num_dimensions, state.y_prev.begin());
             std::swap(state.x_prev, state.x);
+            std::copy_n(candidate.begin(), num_dimensions, state.y_prev.begin());
         }
     }
 }

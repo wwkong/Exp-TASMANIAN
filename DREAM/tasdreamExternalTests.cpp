@@ -568,32 +568,59 @@ void testDebug(){
     cout << "Put here testing code and call this with ./dreamtest debug" << endl;
 
     TasOptimization::ObjectiveFunction f = [](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
+        double sqr_norm = x_batch[0] * x_batch[0] + x_batch[1] * x_batch[1];
         for (size_t i=0; i<fval_batch.size(); i++)
-            fval_batch[i] = 100.0 * (x_batch[2*i] * x_batch[2*i] + x_batch[2*i+1] * x_batch[2*i+1]);
+            fval_batch[i] = 0.01 * exp(sqr_norm);
+            // fval_batch[i] = 100.0 * (x_batch[2*i] * x_batch[2*i] + x_batch[2*i+1] * x_batch[2*i+1]);
     };
     TasOptimization::GradientFunction g = [](const std::vector<double> &x_batch, std::vector<double> &grad_batch)->void {
-        for (size_t i=0; i<grad_batch.size(); i++) grad_batch[i] = 200.0 * x_batch[i];
+        double sqr_norm = x_batch[0] * x_batch[0] + x_batch[1] * x_batch[1];
+        for (size_t i=0; i<grad_batch.size(); i++)
+            grad_batch[i] = 0.01 * 2 * x_batch[i] * exp(sqr_norm);
+        // for (size_t i=0; i<grad_batch.size(); i++)
+        //     grad_batch[i] = 200.0 * x_batch[i];
     };
     TasOptimization::ProjectionFunction proj =  [](const std::vector<double> &x_batch, std::vector<double> &proj_batch)->void {
         for (size_t i=0; i<proj_batch.size(); i++) proj_batch[i] = std::max(-3.0, std::min(3.0, x_batch[i]));
     };
 
+    int num_iters = 50;
     std::vector<double> fval(1);
-    std::vector<double> x = {1.0, 3.0};
-    auto state = TasOptimization::AccelProxDescentState(x, 1.0, 150.0);
+    std::vector<double> x0 = {1.0, 3.0};
+    std::vector<double> x(2);
 
-    for (int k=1; k<=10; k++) {
-        TasOptimization::AccelProxDescent(f, g, proj, 1, state, 4.0, {1.25, 1.25}, {1.25, 1.25});
-        x = state.getCandidate();
+    // PGD
+    std::cout << "GRADIENT DESCENT" << "\n";
+    x = x0;
+    auto pgd_state = TasOptimization::GradientDescentState(x, 1 / 1000.0);
+    for (int k=1; k<=num_iters; k++) {
+        TasOptimization::GradientDescent(f, g, proj, 1, pgd_state, {1.25, 1.25});
+        x = pgd_state.getCandidate();
         f(x, fval);
         std::cout << "k = " << k << std::scientific << std::setprecision(3)
-                  // << ",\tstepsize = " << state.getStepsize()
-                  << ",\t\tm = " << state.getLowerCurvature()
-                  << ",\t\tM = " << state.getUpperCurvature()
+                  << ",\t\tL = " << 1.0 / pgd_state.getStepsize()
                   << ",\t\tx =";
         for (int i=0; i<2; i++) std::cout << " " << x[i];
-        std::cout << ",\tf(x) = " << fval[0] << "\n" << std::endl;
+        std::cout << ",\tf(x) = " << fval[0] << "\n";
     }
+    std::cout << std::endl;
+
+    // APD
+    std::cout << "ACCELERATED PROXIMAL DESCENT" << "\n";
+    x = x0;
+    auto apd_state = TasOptimization::AccelProxDescentState(x, 1.0, 1000.0);
+    for (int k=1; k<=num_iters; k++) {
+        TasOptimization::AccelProxDescent(f, g, proj, 1, apd_state, 4.0, {1.25, 1.25}, {1.25, 1.25});
+        x = apd_state.getCandidate();
+        f(x, fval);
+        std::cout << "k = " << k << std::scientific << std::setprecision(3)
+                  << ",\t\tm = " << apd_state.getLowerCurvature()
+                  << ",\t\tM = " << apd_state.getUpperCurvature()
+                  << ",\t\tx =";
+        for (int i=0; i<2; i++) std::cout << " " << x[i];
+        std::cout << ",\tf(x) = " << fval[0] << "\n";
+    }
+    std::cout << std::endl;
 
 }
 

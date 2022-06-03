@@ -69,7 +69,7 @@ class AccelProxDescentState {
                                  const std::vector<double> &lower_line_search_coeffs, const std::vector<double> &upper_line_search_coeffs);
 
   protected:
-    template<bool failure> void resetInnerState();
+    template<bool failure> void resetInnerState(double lower_adjustment);
     inline std::vector<double> &getCandidateRef() {return candidate;}
     inline std::vector<double> &getUTildeRef() {return u_tilde;}
     inline std::vector<double> &getXPrevRef() {return x_prev;}
