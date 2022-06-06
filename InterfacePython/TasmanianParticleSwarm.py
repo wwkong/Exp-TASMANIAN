@@ -40,7 +40,7 @@ from TasmanianConfig import TasmanianInputError as InputError
 import TasmanianDREAM as DREAM
 
 type_optim_obj_fn = CFUNCTYPE(None, c_int, c_int, POINTER(c_double), POINTER(c_double))
-type_optim_dom_fn = CFUNCTYPE(c_int, c_int, POINTER(c_double))
+type_optim_dom_fn = CFUNCTYPE(None, c_int, c_int, POINTER(c_double), POINTER(c_int))
 type_dream_random = CFUNCTYPE(c_double)
 
 pLibDTSG = cdll.LoadLibrary(__path_libdream__)
@@ -259,7 +259,7 @@ class ParticleSwarmState:
                                                                     c_char_p(random01.sType), c_int(random01.iSeed),
                                                                     type_dream_random(random01.pCallable))
 
-def ParticleSwarm(pObjectiveFunction, iNumIterations, pInside, oParticleSwarmState, fInertiaWeight, fCognitiveCoeff,
+def ParticleSwarm(pObjectiveFunction, pDomainFunction, iNumIterations, oParticleSwarmState, fInertiaWeight, fCognitiveCoeff,
                   fSocialCoeff, random01 = DREAM.RandomGenerator(sType = "default")):
     '''
     Wrapper around TasOptimization::ParticleSwarm().
@@ -271,10 +271,10 @@ def ParticleSwarm(pObjectiveFunction, iNumIterations, pInside, oParticleSwarmSta
     pObjectiveFunction  : a Python lambda representing the objective function; it should take in two 2D NumPy arrays (x_batch, fval_batch)
                           and produce no outputs; when it is called, it should write the result of applying the objective function
                           to every row of x_batch to fval_batch; it is expected that x_batch.shape[1] = .getNumDimensions().
+    pDomainFunction     : a Python lambda representing the function domain; it should take two 2D NumPy arrays (x_batch, inside_batch)
+                          and produce no outputs; when it is called, it should write True to the i-th entry in inside_batch if
+                          the i-th row of x_batch is in the function domain; it is expected that x_batch.shape[1] = .getNumDimensions().
     iNumIterations      : a positive integer representing the number iterations the algorithm is run.
-    pInside             : a Python lambda representing the function domain; it should take in one 2D NumPy array (x) and produce a
-                          Boolean (isInside); when called, it should return True if x is in the domain and False otherwise;
-                          it is expected that x.shape[0] = .getNumDimensions().
     oParticleSwarmState : an instance of the Python ParticleSwarmState class; it will contain the results of applying the algorithm.
     fInertiaWeight      : a double that controls the speed of the particles; should be in (0,1).
     fCognitiveCoeff     : a double that controls how much a particle favors its own trajectory; usually in [1,3].
@@ -286,11 +286,12 @@ def ParticleSwarm(pObjectiveFunction, iNumIterations, pInside, oParticleSwarmSta
         aY = np.ctypeslib.as_array(fval_ptr, (num_batch,))
         pObjectiveFunction(aX, aY)
 
-    def cpp_dom_fn(num_dim, x_ptr):
-        aX = np.ctypeslib.as_array(x_ptr, (num_dim,))
-        return pInside(aX)
+    def cpp_dom_fn(num_dim, num_batch, x_batch_ptr, inside_ptr):
+        aX = np.ctypeslib.as_array(x_batch_ptr, (num_batch, num_dim))
+        aY = np.ctypeslib.as_array(inside_ptr, (num_batch,))
+        pDomainFunction(aX)
 
-    pLibDTSG.tsgParticleSwarm(type_optim_obj_fn(cpp_obj_fn), c_int(iNumIterations), type_optim_dom_fn(cpp_dom_fn),
+    pLibDTSG.tsgParticleSwarm(type_optim_obj_fn(cpp_obj_fn), type_optim_dom_fn(cpp_dom_fn), c_int(iNumIterations), 
                               oParticleSwarmState.pStatePntr, c_double(fInertiaWeight), c_double(fCognitiveCoeff),
                               c_double(fSocialCoeff), c_char_p(random01.sType), c_int(random01.iSeed),
                               type_dream_random(random01.pCallable))

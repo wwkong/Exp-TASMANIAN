@@ -76,12 +76,12 @@ public:
     //! \brief Returns the status of the model as a string.
     std::string getModelStatusName() const;
     //! \brief Returns the objective function.
-    auto getObjectiveFunction() const {return obj_fn;}
+    ObjectiveFunction getObjectiveFunction() const {return obj_fn;}
     //! \brief Returns the objective value if there is a valid candidate point.
     double getObjectiveValue() const {
         if (valid_candidate) {
-            std::vector<double> dummy, fval(1);
-            obj_fn(candidate_solution, fval, dummy, nullptr);
+            std::vector<double> fval(1);
+            obj_fn(candidate_solution, fval);
             return fval[0];
         }
         throw std::runtime_error("ERROR: in getObjectiveValue(), no valid candidate solution found!");
@@ -93,7 +93,7 @@ public:
             // We need domain-feasible candidates for stationarity measures.
             if (valid_grad_fn) {
                 std::vector<double> grad(num_dimensions), neg_grad_proj(num_dimensions), fval(1);
-                obj_fn(candidate_solution, fval, grad, nullptr);
+                obj_fn(candidate_solution, fval);
                 // Projection of the negative gradient onto the normal cone.
                 for (int i=0; i<num_dimensions; i++) {
                     if (std::fabs(candidate_solution[i] - domain_lower_bounds[i]) <= TasGrid::Maths::num_tol)

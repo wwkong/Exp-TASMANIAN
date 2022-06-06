@@ -36,7 +36,7 @@
 
 #include "tsgGradientDescent.hpp"
 
-namespace TasOptimization {
+namespace TasOPT {
 
 GradientDescentState::GradientDescentState(const std::vector<double> &x, const double stepsize) :
         num_dimensions((int) x.size()), stepsize(stepsize), candidate(x) {};

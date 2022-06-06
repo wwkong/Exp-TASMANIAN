@@ -47,7 +47,7 @@
  * \endinternal
  */
 
-namespace TasOptimization {
+namespace TasOPT {
 
 /*!
  * \ingroup OptimizationState

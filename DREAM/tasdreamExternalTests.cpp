@@ -574,7 +574,7 @@ void testDebug(){
 
     TasOPT::ObjectiveFunction obj_fn =
             // Six-hump camel function.
-            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double> &grad_batch, const void*)->void {
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
                 for (size_t i=0; i<fval_batch.size(); i++) {
                     double x0 = x_batch[num_dimensions * i];
                     double x1 = x_batch[num_dimensions * i + 1];
@@ -582,33 +582,7 @@ void testDebug(){
                                      x0 * x1 +
                                      (-4.0 + 4.0 * x1 * x1) * x1 * x1;
                 }
-                if (grad_batch.size() > 0) {
-                    for (size_t i=0; i<fval_batch.size(); i++) {
-                        double x0 = x_batch[num_dimensions * i];
-                        double x1 = x_batch[num_dimensions * i + 1];
-                        grad_batch[2*i] = 8.0 * x0 - 2.1 * 4.0 * x0 * x0 * x0 + 2.0 * x0 * x0 * x0 * x0 * x0 + x1;
-                        grad_batch[2*i + 1] = x0 - 8.0 * x1 + 16.0 * x1 * x1 * x1;
-                    }
-                }
             };
-
-     // TasOPT::ObjectiveFunction obj_fn =
-     //        // Negative l2-norm squared.
-     //        [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double> &grad_batch, const void*)->void {
-     //            for (size_t i=0; i<fval_batch.size(); i++) {
-     //                double x0 = x_batch[num_dimensions * i];
-     //                double x1 = x_batch[num_dimensions * i + 1];
-     //                fval_batch[i] = -x0 * x0 - x1 * x1;
-     //            }
-     //            if (grad_batch.size() > 0) {
-     //                for (size_t i=0; i<fval_batch.size(); i++) {
-     //                    double x0 = x_batch[num_dimensions * i];
-     //                    double x1 = x_batch[num_dimensions * i + 1];
-     //                    grad_batch[2*i] = -2.0 * x0;
-     //                    grad_batch[2*i + 1] = -2.0 * x1;
-     //                }
-     //            }
-     //        };
 
     auto model = TasOPT::OptimizationModel(num_dimensions);
     model.setAlgorithm(TasOPT::PARTICLE_SWARM);

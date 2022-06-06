@@ -93,25 +93,17 @@ OptimizationModel::OptimizationModel(TasGrid::TasmanianSparseGrid &&source_grid)
 
 void OptimizationModel::reconfigure() {
     // Re-assigns certain internals of the model. Should be called when there is change in one of the major attributes.
-    internal_dom_fn = [=](const std::vector<double> &x_batch, std::vector<bool> &inside_batch, std::vector<double> &dproj_batch, const void*)->void {
+    internal_dom_fn = [=](const std::vector<double> &x_batch, std::vector<int> &inside_batch)->void {
         std::fill(inside_batch.begin(), inside_batch.end(), true);
         for (size_t i=0; i<inside_batch.size(); i++)
             for (int j=0; j<num_dimensions; j++)
                 inside_batch[i] = inside_batch[i] and (x_batch[i * num_dimensions + j] >= domain_lower_bounds[j] and
                                                        x_batch[i * num_dimensions + j] <= domain_upper_bounds[j]);
-        if (not dproj_batch.empty())
-            for (size_t i=0; i<inside_batch.size(); i++)
-                for (int j=0; j<num_dimensions; j++)
-                    dproj_batch[i * num_dimensions + j] =
-                            std::min(std::max(domain_lower_bounds[j], x_batch[i * num_dimensions + j]), domain_upper_bounds[j]);
-            };
+    };
     if (not valid_obj_fn) {
         if (not internal_grid.empty() and (internal_grid.getNumLoaded() == internal_grid.getNumPoints())) {
-            obj_fn = [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double> &grad_batch, const void*)->void {
+            obj_fn = [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
                 internal_grid.evaluateBatch<double>(x_batch, fval_batch);
-                if (not grad_batch.empty())
-                    for(size_t i=0; i<fval_batch.size(); i++)
-                        internal_grid.differentiate(&(x_batch[i * num_dimensions]), &(fval_batch[i]));
             };
         }
         valid_obj_fn = true;
@@ -176,18 +168,16 @@ void OptimizationModel::optimize() {
 
     ObjectiveFunction internal_obj_fn = obj_fn;
     if (sense == MAXIMIZE)
-        internal_obj_fn = [&](const std::vector<double> &x_batch, std::vector<double> &fval_batch,
-                              std::vector<double> &fgrad_batch, const void* fdata)->void {
-            obj_fn(x_batch, fval_batch, fgrad_batch, fdata);
+        internal_obj_fn = [&](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
+            obj_fn(x_batch, fval_batch);
             for (auto &f : fval_batch) f *= -1.0;
-            for (auto &g : fgrad_batch) g *= -1.0;
         };
 
     // Create a function alg_step() that iterates an algorithm once. May depend on dynamically allocated state data (alg_state).
     std::function<void(void)> alg_step;
     std::unique_ptr<BaseState> alg_state;
     if (opt_alg == PARTICLE_SWARM) {
-        alg_state = std::make_unique<ParticleSwarmState>(num_dimensions, alg_params_int["num_particles"]);
+        alg_state = TasGrid::Utils::make_unique<ParticleSwarmState>(num_dimensions, alg_params_int["num_particles"]);
         dynamic_cast<ParticleSwarmState*>(alg_state.get())->initializeParticlesInsideBox(domain_lower_bounds, domain_upper_bounds);
         alg_step = [&]() {
             ParticleSwarm(internal_obj_fn, internal_dom_fn, 1, *dynamic_cast<ParticleSwarmState*>(alg_state.get()),
@@ -201,7 +191,7 @@ void OptimizationModel::optimize() {
         alg_step();
         iteration_count++;
         runtime += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
-        std::vector<double> alg_solution = alg_state->getBestPoint();
+        std::vector<double> alg_solution = alg_state->getCandidate();
         checkCandidate(alg_solution);
         if (valid_grad_fn and valid_candidate)
             stationarity = getStationarityValue();
@@ -240,9 +230,9 @@ void OptimizationModel::checkCandidate(std::vector<double> &x) {
         candidate_solution = x;
     } else {
         // Check if we can replace the current candidate.
-        std::vector<double> dummy, fvals_temp(1), fvals_candidate(1);
-        obj_fn(x, fvals_temp, dummy, nullptr);
-        obj_fn(candidate_solution, fvals_candidate, dummy, nullptr);
+        std::vector<double> fvals_temp(1), fvals_candidate(1);
+        obj_fn(x, fvals_temp);
+        obj_fn(candidate_solution, fvals_candidate);
         if (fvals_temp[0] < fvals_candidate[0]) candidate_solution = x;
     }
 }

@@ -36,7 +36,7 @@
 
 #include "tsgAccelProxDescent.hpp"
 
-namespace TasOptimization {
+namespace TasOPT {
 
 AccelProxDescentState::AccelProxDescentState(const std::vector<double> candidate, const double lower, const double upper) :
         num_dimensions((int) candidate.size()), lower_curvature(std::max(lower, TasGrid::Maths::num_tol)),

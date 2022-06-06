@@ -36,7 +36,7 @@
 
 #include "tsgOptimizationUtils.hpp"
 
-namespace TasOptimization {
+namespace TasOPT {
 
 class AccelProxDescentState {
   public:

@@ -120,14 +120,14 @@ bool testParticleSwarmSingle(ObjectiveFunction f, DomainFunction h, ParticleSwar
     // Check optimality and state changes of the run.
     std::vector<double> best_swarm_point = state.getBestPosition();
     std::vector<double> best_swarm_value_vec(1), dummy_vec;
-    f(best_swarm_point, best_swarm_value_vec, dummy_vec, nullptr);
+    f(best_swarm_point, best_swarm_value_vec);
     pass = pass and std::fabs(best_swarm_value_vec[0] - optimal_val) <= TasGrid::Maths::num_tol;
     std::vector<bool> init_vector = state.getStateVector();
     pass = pass and init_vector[3];
 
     // Make sure subsequent runs do not make any strange modifications.
     ParticleSwarm(f, h, 1, state, 0.5, 2, 2, get_rand);
-    f(best_swarm_point, best_swarm_value_vec, dummy_vec, nullptr);
+    f(best_swarm_point, best_swarm_value_vec);
     pass = pass and std::fabs(best_swarm_value_vec[0] - optimal_val) <= TasGrid::Maths::num_tol;
     init_vector = state.getStateVector();
     pass = pass and init_vector[3];
@@ -150,7 +150,7 @@ bool testParticleSwarm(bool verbose) {
     std::vector<double> lower(num_dimensions, -5.0);
     std::vector<double> upper(num_dimensions, 2.0);
     TasOPT::ObjectiveFunction l1_fn =
-            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double>, const void*)->void {
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
                 int num_points = x_batch.size() / num_dimensions;
                 std::fill(fval_batch.begin(), fval_batch.end(), 0.0);
                 for (int i=0; i<num_points; i++)
@@ -158,7 +158,7 @@ bool testParticleSwarm(bool verbose) {
                         fval_batch[i] += std::fabs(x_batch[i * num_dimensions + j]);
             };
     TasOPT::DomainFunction l1_box =
-            [=](const std::vector<double> &x_batch, std::vector<bool> &inside_batch, std::vector<double>, const void*)->void {
+            [=](const std::vector<double> &x_batch, std::vector<int> &inside_batch)->void {
                int num_points = x_batch.size() / num_dimensions;
                std::fill(inside_batch.begin(), inside_batch.end(), true);
                for (int i=0; i<num_points; i++)
@@ -177,7 +177,7 @@ bool testParticleSwarm(bool verbose) {
     lower = {-3.0, -2.0};
     upper = {3.0, 2.0};
     TasOPT::ObjectiveFunction shc_fn =
-            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch, std::vector<double>, const void*)->void {
+            [=](const std::vector<double> &x_batch, std::vector<double> &fval_batch)->void {
                 int num_points = x_batch.size() / num_dimensions;
                 for (int i=0; i<num_points; i++) {
                     double x0 = x_batch[num_dimensions * i];
@@ -188,7 +188,7 @@ bool testParticleSwarm(bool verbose) {
                 }
             };
     TasOPT::DomainFunction shc_box =
-            [=](const std::vector<double> &x_batch, std::vector<bool> &inside_batch, std::vector<double>, const void*)->void {
+            [=](const std::vector<double> &x_batch, std::vector<int> &inside_batch)->void {
                 int num_points = x_batch.size() / num_dimensions;
                 std::fill(inside_batch.begin(), inside_batch.end(), true);
                 for (int i=0; i<num_points; i++)

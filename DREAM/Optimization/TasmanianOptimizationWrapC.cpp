@@ -40,10 +40,10 @@
 
 // C Function Pointer Aliases
 using tsg_dream_random = double (*)();
-using tsg_optim_dom_fn = int    (*)(const int, const double[]);
+using tsg_optim_dom_fn = void   (*)(const int, const int, const double[], int[]);
 using tsg_optim_obj_fn = void   (*)(const int, const int, const double[], double[]);
 
-namespace TasOptimization{
+namespace TasOPT {
 
 extern "C" {
 
@@ -123,7 +123,7 @@ extern "C" {
     }
 
     // Particle Swarm Algorithm.
-    void tsgParticleSwarm(const tsg_optim_obj_fn f_ptr, const int num_iterations, const tsg_optim_dom_fn inside_ptr, void *state,
+    void tsgParticleSwarm(const tsg_optim_obj_fn f_ptr, const tsg_optim_dom_fn inside_ptr, const int num_iterations, void *state,
                           const double inertia_weight, const double cognitive_coeff, const double social_coeff,
                           const char* random_type, const int random_seed, tsg_dream_random random_callback) {
         // Create the U[0,1] random number generator.
@@ -146,11 +146,12 @@ extern "C" {
             int num_dims = x_batch.size() / num_batch;
             (*f_ptr)(num_dims, num_batch, x_batch.data(), fval_batch.data());
         };
-        auto inside_cpp = [&](const std::vector<double> &x)->bool {
-            int num_dims = x.size();
-            return (*inside_ptr)(num_dims, x.data());
+        auto inside_cpp = [&](const std::vector<double> &x_batch, std::vector<int> &inside_batch)->void {
+            int num_batch = inside_batch.size();
+            int num_dims = x_batch.size() / num_batch;
+            (*inside_ptr)(num_dims, num_batch, x_batch.data(), inside_batch.data());
         };
-        ParticleSwarm(f_cpp, num_iterations, inside_cpp, *(reinterpret_cast<ParticleSwarmState*>(state)), inertia_weight,
+        ParticleSwarm(f_cpp, inside_cpp, num_iterations, *(reinterpret_cast<ParticleSwarmState*>(state)), inertia_weight,
                       cognitive_coeff, social_coeff, randgen);
     }
 
